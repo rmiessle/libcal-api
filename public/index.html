@@ -1,22 +1,69 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Study‑Room Availability</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<style>
- body{font-family:sans-serif;margin:1rem}
- h1{font-size:1.25rem;margin-bottom:0.5rem}
- #grid{display:grid;gap:3px;border:1px solid #ccc}
- .cell{padding:.4rem .3rem;text-align:center;font-size:.8rem;border:1px solid #ccc}
- .free{background:#fff;color:#000}
- .busy{background:#c62828;color:#fff}
-</style>
+  <meta charset="utf-8" />
+  <title>Study‑Room Availability</title>
+
+  <!-- Modern, clean typeface -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* ---------- base layout ---------- */
+    body{
+      font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',
+                  Helvetica,Arial,sans-serif;
+      margin:1rem;
+    }
+    h1{
+      font-size:1.3rem;
+      margin-bottom:.75rem;
+      font-weight:600;
+    }
+
+    /* ---------- responsive grid ---------- */
+    #grid{
+      display:grid;
+      gap:6px;                                      /* space between blocks   */
+      grid-template-columns:repeat(8,minmax(0,1fr));/* max 8 columns, wrap    */
+      grid-auto-flow:row;
+    }
+
+    /* ---------- cell styles ---------- */
+    .cell{
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      aspect-ratio:1/1;                              /* perfect square         */
+      border:none;                                   /* default—overridden for .free */
+      border-radius:8px;
+      font-size:1.05rem;                             /* larger text overall    */
+      font-weight:600;
+      text-align:center;
+      padding:.4rem .2rem;
+    }
+
+    /* AVAILABLE  */
+    .free{
+      background:#ffffff;
+      color:#000000;
+      border:2px solid #000000;                      /* black border only on AVAILABLE */
+    }
+
+    /* OCCUPIED */
+    .busy{
+      background:#e53935;
+      color:#ffffff;
+    }
+  </style>
 </head>
 <body>
   <h1 id="title"></h1>
   <div id="grid"></div>
 
-<script type="module" src="board.js"></script>
+  <script type="module" src="board.js"></script>
 </body>
 </html>
