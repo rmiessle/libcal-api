@@ -1,0 +1,3 @@
+# never commit runtime junk
+node_modules/
+.env
