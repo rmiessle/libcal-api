@@ -2,58 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Study‑Room Availability</title>
+  <title>Study-Room Availability</title>
 
-  <!-- Modern, clean typeface -->
+  <!-- Modern font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    /* ---------- base layout ---------- */
+    /* ---------- Base layout ---------- */
+    :root{
+      --gap: 8px;                                     /* space between blocks */
+      --cols: 8;                                      /* max columns          */
+    }
     body{
       font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',
                   Helvetica,Arial,sans-serif;
       margin:1rem;
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
     }
     h1{
-      font-size:1.3rem;
-      margin-bottom:.75rem;
+      font-size:clamp(1.1rem,2vw,1.6rem);
+      margin:0 0 1rem 0;
       font-weight:600;
+      text-align:center;
     }
 
-    /* ---------- responsive grid ---------- */
+    /* ---------- Grid container ---------- */
     #grid{
+      flex:1 1 auto;                                  /* fill remaining height  */
       display:grid;
-      gap:6px;                                      /* space between blocks   */
-      grid-template-columns:repeat(8,minmax(0,1fr));/* max 8 columns, wrap    */
+      gap:var(--gap);
+      grid-template-columns:repeat(var(--cols),minmax(0,1fr));
       grid-auto-flow:row;
+      overflow-y:auto;                                /* scroll if too many rows */
+      padding-bottom:var(--gap);                      /* tiny extra space at end */
     }
 
-    /* ---------- cell styles ---------- */
+    /* ---------- Grid cells ---------- */
     .cell{
       display:flex;
       flex-direction:column;
       justify-content:center;
       align-items:center;
-      aspect-ratio:1/1;                              /* perfect square         */
-      border:none;                                   /* default—overridden for .free */
+      aspect-ratio:1/1;                               /* perfect square */
       border-radius:8px;
-      font-size:1.05rem;                             /* larger text overall    */
+      font-size:clamp(.9rem,1.2vw,1.15rem);           /* responsive text */
       font-weight:600;
       text-align:center;
-      padding:.4rem .2rem;
+      padding:.5rem .25rem;
     }
-
-    /* AVAILABLE  */
     .free{
       background:#ffffff;
       color:#000000;
-      border:2px solid #000000;                      /* black border only on AVAILABLE */
+      border:2px solid #000000;                       /* black border for AVAILABLE */
     }
-
-    /* OCCUPIED */
     .busy{
       background:#e53935;
       color:#ffffff;
@@ -61,7 +67,7 @@
   </style>
 </head>
 <body>
-  <h1 id="title"></h1>
+  <h1 id="title">Loading…</h1>
   <div id="grid"></div>
 
   <script type="module" src="board.js"></script>
