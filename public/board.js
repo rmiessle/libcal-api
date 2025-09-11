@@ -1,6 +1,6 @@
 import dayjs from 'https://cdn.jsdelivr.net/npm/dayjs@1/+esm';
 
-const REFRESH_MS = 5 * 60_000;          // 5-minute refresh
+const REFRESH_MS = 1 * 60_000;          // 1-minute refresh
 const gridEl     = document.getElementById('grid');
 const titleEl    = document.getElementById('title');
 
