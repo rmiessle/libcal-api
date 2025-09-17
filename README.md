@@ -70,6 +70,23 @@ xset -dpms
 ```
 chmod +x /home/USER/dpms_disable.sh
 ```
+##### create script to load kiosk and wait for internet connection
+```
+sudo nano /home/<USER>/load-kiosk.sh
+```
+###### append
+```
+#!/bin/bash
+URL="http://localhost:4000"
+until curl --silet --head "$URL" | grep "200 OK" > /dev/null; do
+ sleep 5
+done
+chromium --noerrdialogs --disable-infobars --incognito --no-first-start --kiosk http://localhost:4000
+```
+###### set permissions
+```
+chmod +x /home/USER/load-kiosh.sh
+```
 ##### install unclutter-xfixes
 ```
 sudo apt update
@@ -87,7 +104,7 @@ sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
 @unclutter-xfixes -idle 0
 @sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /home/<USER>/.config/chromium/Default/Preferences 
 @sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/' /home/<USER>/.config/chromium/Default/Preferences 
-@chromium --noerrdialogs --disable-infobars --incognito --no-first-start --kiosk http://localhost:4000
+@home/<USER>/load-kiosk.sh
 ```
 ##### screen blanking script when closed
 ###### create script
