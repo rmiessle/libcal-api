@@ -1,23 +1,12 @@
 /* ------------------------------------------------------------------
    Study-Room Board – Express back-end (timezone-aware, date-safe)
-   --------------------------------------------------------------
-   • Uses LibCal /hours/{LOCATION_ID} to get *today’s* open/close
-   • Pins all date math to a chosen TZ (default America/New_York)
-   • Handles midnight rollover (e.g., 08:00 → 01:00 next day)
-   • Fetches bookings for today (+ tomorrow if spanning midnight)
-   • Filters out canceled/etc. bookings by status
-   • Marks slots OCCUPIED/AVAILABLE using full datetime keys
-   • Keeps each slot visible until its *end* time passes
-   • Shows full day after closing to avoid an empty screen
-   • Caches OAuth token to avoid rate limits
 ------------------------------------------------------------------- */
 
 import express from 'express';
-import fetch   from 'node-fetch';
-import dotenv  from 'dotenv';
-import dayjs   from 'dayjs';
+import dotenv from 'dotenv';
+import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import utc     from 'dayjs/plugin/utc.js';
+import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 
 dayjs.extend(customParseFormat);
@@ -29,12 +18,12 @@ dotenv.config();
    Environment
 -------------------------------------------------- */
 const {
-  LIBCAL_HOST,               // e.g., https://libcal.gettysburg.edu
+  LIBCAL_HOST,               // e.g., https://libcal.gettysburg.edu   (no trailing /api)
   LIBCAL_CLIENT_ID,
   LIBCAL_CLIENT_SECRET,
   ROOM_ID,                   // space (room) ID for /space/bookings
   LOCATION_ID,               // location/library ID for /hours/{id}
-  TIMEZONE = 'America/New_York', // <<< pin app to this zone
+  TIMEZONE = 'America/New_York',
   FALLBACK_OPEN  = 8,        // used only if hours API fails (24h clock)
   FALLBACK_CLOSE = 23,
   PORT           = 4000
@@ -49,30 +38,54 @@ const app = express();
 app.use(express.static('public'));
 
 /* --------------------------------------------------
-   OAuth token cache
+   OAuth token cache with robust token fetch
 -------------------------------------------------- */
 let tokenCache = { token: null, expires: 0 };
 
 async function getAccessToken() {
   if (tokenCache.token && Date.now() < tokenCache.expires) return tokenCache.token;
 
-  const res = await fetch(`${LIBCAL_HOST}/api/1.1/oauth/token`, {
-    method : 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body   : new URLSearchParams({
-      grant_type   : 'client_credentials',
-      client_id    : LIBCAL_CLIENT_ID,
-      client_secret: LIBCAL_CLIENT_SECRET
-    })
+  const form = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id:  LIBCAL_CLIENT_ID,
+    client_secret: LIBCAL_CLIENT_SECRET
   });
-  if (!res.ok) throw new Error(`OAuth failed (${res.status})`);
-  const json = await res.json();
 
-  tokenCache = {
-    token  : json.access_token,
-    expires: Date.now() + (json.expires_in - 60) * 1000
-  };
-  return tokenCache.token;
+  const tokenUrls = [
+    `${LIBCAL_HOST}/1.1/oauth/token`,
+    `${LIBCAL_HOST}/api/1.1/oauth/token`
+  ];
+
+  let lastErr;
+  for (const url of tokenUrls) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        console.error('OAUTH_HTTP_ERROR', r.status, url, text.slice(0, 800));
+        lastErr = new Error(`OAuth failed (${r.status})`);
+        continue;
+      }
+      let json;
+      try { json = JSON.parse(text); } catch (e) {
+        console.error('OAUTH_PARSE_ERROR', url, text.slice(0, 800));
+        throw e;
+      }
+      tokenCache = {
+        token:   json.access_token,
+        expires: Date.now() + (json.expires_in ? (json.expires_in - 60) * 1000 : 59 * 60 * 1000)
+      };
+      return tokenCache.token;
+    } catch (e) {
+      lastErr = e;
+      console.error('OAUTH_FETCH_ERROR', url, String(e));
+    }
+  }
+  throw lastErr || new Error('OAuth failed');
 }
 
 /* --------------------------------------------------
@@ -104,8 +117,13 @@ function isActiveStatus(status) {
 async function getTodayHours(bearer, isoDate) {
   try {
     const url  = `${LIBCAL_HOST}/api/1.1/hours/${LOCATION_ID}?date=${isoDate}`;
-    const json = await fetch(url, { headers:{ Authorization:`Bearer ${bearer}` } })
-                 .then(r => r.json());
+    const r = await fetch(url, { headers:{ Authorization:`Bearer ${bearer}` } });
+    const payloadText = await r.text();
+    if (!r.ok) {
+      console.error('HOURS_HTTP_ERROR', r.status, payloadText.slice(0, 800));
+      throw new Error(`Hours HTTP ${r.status}`);
+    }
+    const json = JSON.parse(payloadText);
 
     // Your tenant shape: [{"dates": { "<YYYY-MM-DD>": { status, hours:[{from,to}] } }}]
     const dayData = json?.[0]?.dates?.[isoDate];
@@ -133,7 +151,8 @@ async function getTodayHours(bearer, isoDate) {
     );
 
     return { openStr, closeStr };
-  } catch {
+  } catch (e) {
+    console.error('HOURS_FALLBACK_REASON', String(e));
     // Fall back if hours endpoint is unavailable
     return {
       openStr : `${String(FALLBACK_OPEN).padStart(2,'0')}:00`,
@@ -189,18 +208,30 @@ app.get('/api/today', async (_req, res) => {
     /* ---- Bookings (today + tomorrow if spanning midnight) ---- */
     const mkBookingsUrl = d => `${LIBCAL_HOST}/api/1.1/space/bookings?eid=${ROOM_ID}&date=${d}`;
 
-    const bookingsToday = await fetch(mkBookingsUrl(todayISO), {
+    // today
+    const rToday = await fetch(mkBookingsUrl(todayISO), {
       headers: { Authorization: `Bearer ${bearer}` }
-    }).then(r => r.json());
+    });
+    const textToday = await rToday.text();
+    if (!rToday.ok) {
+      console.error('BOOKINGS_HTTP_ERROR_TODAY', rToday.status, textToday.slice(0, 800));
+      throw new Error(`Bookings HTTP ${rToday.status}`);
+    }
+    let bookings = JSON.parse(textToday);
 
-    let bookings = bookingsToday;
-
+    // tomorrow (if needed)
     if (spansNextDay) {
       const tomorrowISO = dayjs.tz(todayISO, 'YYYY-MM-DD', TZ).add(1,'day').format('YYYY-MM-DD');
-      const bookingsTomorrow = await fetch(mkBookingsUrl(tomorrowISO), {
+      const rTomorrow = await fetch(mkBookingsUrl(tomorrowISO), {
         headers: { Authorization: `Bearer ${bearer}` }
-      }).then(r => r.json());
-      bookings = bookingsToday.concat(bookingsTomorrow);
+      });
+      const textTomorrow = await rTomorrow.text();
+      if (!rTomorrow.ok) {
+        console.error('BOOKINGS_HTTP_ERROR_TOMORROW', rTomorrow.status, textTomorrow.slice(0, 800));
+        throw new Error(`Bookings HTTP ${rTomorrow.status}`);
+      }
+      const bookingsTomorrow = JSON.parse(textTomorrow);
+      bookings = bookings.concat(bookingsTomorrow);
     }
 
     /* ---- Build set of taken half-hour slices (DATE + time keys) ---- */
@@ -231,10 +262,13 @@ app.get('/api/today', async (_req, res) => {
 
     res.json({ dateDisplay, grid });
   } catch (err) {
-    console.error(err);
+    console.error('ROUTE_ERROR', String(err));
     res.status(500).json({ error: err.message });
   }
 });
+
+/* Optional tiny health endpoint */
+app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 /* --------------------------------------------------
    Start HTTP listener
@@ -242,25 +276,3 @@ app.get('/api/today', async (_req, res) => {
 app.listen(PORT, () => {
   console.log(`⇢  http://localhost:${PORT}  (TZ=${TZ})`);
 });
-
-/* --------------------------------------------------
-   DEBUG ROUTES (disabled) – uncomment temporarily if needed
-   ----------------------------------------------------------------
-   // Inspect raw hours JSON:
-   // app.get('/api/debug/hours', async (_req, res) => {
-   //   const bearer = await getAccessToken();
-   //   const today  = dayjs().tz(TZ).format('YYYY-MM-DD');
-   //   const url    = `${LIBCAL_HOST}/api/1.1/hours/${LOCATION_ID}?date=${today}`;
-   //   const raw    = await fetch(url, { headers:{Authorization:`Bearer ${bearer}` } }).then(r => r.text());
-   //   res.type('text/plain').send(raw);
-   // });
-
-   // Inspect raw bookings for a given date (?d=YYYY-MM-DD, default today):
-   // app.get('/api/debug/bookings', async (req, res) => {
-   //   const d = req.query.d || dayjs().tz(TZ).format('YYYY-MM-DD');
-   //   const bearer = await getAccessToken();
-   //   const url = `${LIBCAL_HOST}/api/1.1/space/bookings?eid=${ROOM_ID}&date=${d}`;
-   //   const raw = await fetch(url, { headers:{Authorization:`Bearer ${bearer}` } }).then(r => r.text());
-   //   res.type('text/plain').send(raw);
-   // });
-------------------------------------------------------------------- */
