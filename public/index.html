@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="600" />
   <title>Study-Room Availability</title>
 
   <!-- Modern font -->
@@ -12,10 +11,9 @@
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    /* ---------- Base layout ---------- */
     :root{
-      --gap: 8px;                                     /* space between blocks */
-      --cols: 8;                                      /* max columns          */
+      --gap: 8px;            /* spacing between blocks */
+      --cols: 8;             /* max columns */
     }
     body{
       font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',
@@ -24,6 +22,7 @@
       display:flex;
       flex-direction:column;
       min-height:100vh;
+      background:#f7f7f7;
     }
     h1{
       font-size:clamp(1.1rem,2vw,1.6rem);
@@ -31,39 +30,40 @@
       font-weight:600;
       text-align:center;
     }
-
-    /* ---------- Grid container ---------- */
     #grid{
-      flex:1 1 auto;                                  /* fill remaining height  */
+      flex:1 1 auto;
       display:grid;
       gap:var(--gap);
       grid-template-columns:repeat(var(--cols),minmax(0,1fr));
       grid-auto-flow:row;
-      overflow-y:auto;                                /* scroll if too many rows */
-      padding-bottom:var(--gap);                      /* tiny extra space at end */
+      overflow-y:auto;
+      padding-bottom:var(--gap);
     }
-
-    /* ---------- Grid cells ---------- */
     .cell{
       display:flex;
       flex-direction:column;
       justify-content:center;
       align-items:center;
-      aspect-ratio:1/1;                               /* perfect square */
+      aspect-ratio:1/1;                 /* squares */
       border-radius:8px;
-      font-size:clamp(.9rem,1.2vw,1.15rem);           /* responsive text */
+      font-size:clamp(.9rem,1.2vw,1.15rem);
       font-weight:600;
       text-align:center;
       padding:.5rem .25rem;
+      background:#fff;
     }
     .free{
-      background:#A8DCAB;
-      color:#000000;
-      border:2px solid #000000;                       /* black border for AVAILABLE */
+      color:#000;
+      border:2px solid #000;            /* black border for AVAILABLE */
     }
     .busy{
       background:#e53935;
-      color:#ffffff;
+      color:#fff;
+      border:none;
+    }
+    .status{
+      font-size:clamp(.8rem,1vw,.95rem);
+      margin-top:.25rem;
     }
   </style>
 </head>
