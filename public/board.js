@@ -1,29 +1,29 @@
-import dayjs from 'https://cdn.jsdelivr.net/npm/dayjs@1/+esm';
-
-const REFRESH_MS = 1 * 60_000;          // 1-minute refresh
+// ES module; runs in the browser
+const REFRESH_MS = 5 * 60_000;          // refresh every 5 minutes
 const gridEl     = document.getElementById('grid');
 const titleEl    = document.getElementById('title');
 
 async function draw() {
   try {
-    const { dateDisplay, grid } = await fetch('/api/today').then(r => r.json());
+    const r = await fetch('/api/today', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const { dateDisplay, grid } = await r.json();
 
     titleEl.textContent = `Room Availability for ${dateDisplay}`;
-    gridEl.innerHTML    = '';           // clear previous cells
+    gridEl.innerHTML = '';
 
     grid.forEach(slot => {
       const div = document.createElement('div');
       div.className = `cell ${slot.booked ? 'busy' : 'free'}`;
       div.innerHTML = `
         <div>${slot.label}</div>
-        <div style="font-size:clamp(.8rem,1vw,.95rem);margin-top:.25rem">
-          ${slot.booked ? 'OCCUPIED' : 'AVAILABLE'}
-        </div>`;
+        <div class="status">${slot.booked ? 'OCCUPIED' : 'AVAILABLE'}</div>
+      `;
       gridEl.appendChild(div);
     });
   } catch (err) {
-    titleEl.textContent = 'Error loading schedule';
-    console.error(err);
+    console.error('UI_FETCH_ERROR', err);
+    titleEl.textContent = 'Room Availability — error contacting server';
   }
 }
 
